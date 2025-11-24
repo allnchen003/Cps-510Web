@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manage Records</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="max-w-7xl mx-auto p-4">
+      <div class="bg-white rounded-lg shadow-xl p-6 mt-8">
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-3xl font-bold text-gray-800">Manage Records</h2>
+          <a
+            href="/"
+            class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg"
+            >Back to Menu</a
+          >
+        </div>
+        <div class="mb-6">
+          <h3 class="text-xl font-semibold mb-4">Add New Person</h3>
+          <div class="grid md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              id="firstName"
+              placeholder="First Name"
+              class="p-3 border border-gray-300 rounded-lg"
+            />
+            <input
+              type="text"
+              id="lastName"
+              placeholder="Last Name"
+              class="p-3 border border-gray-300 rounded-lg"
+            />
+            <input
+              type="email"
+              id="email"
+              placeholder="Email"
+              class="p-3 border border-gray-300 rounded-lg"
+            />
+            <input
+              type="text"
+              id="phone"
+              placeholder="Phone Number"
+              class="p-3 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <button
+            onclick="addPerson()"
+            class="mt-4 bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg"
+          >
+            Add Person
+          </button>
+        </div>
+
+        <div id="personsList" class="overflow-x-auto">
+          <h3 class="text-xl font-semibold mb-4">All Persons</h3>
+          <table class="min-w-full bg-white border border-gray-300">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="px-4 py-2 border-b text-left">ID</th>
+                <th class="px-4 py-2 border-b text-left">First Name</th>
+                <th class="px-4 py-2 border-b text-left">Last Name</th>
+                <th class="px-4 py-2 border-b text-left">Email</th>
+                <th class="px-4 py-2 border-b text-left">Phone</th>
+                <th class="px-4 py-2 border-b text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="personsTableBody">
+              <tr>
+                <td colspan="6" class="text-center py-4">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== "") {
+          const cookies = document.cookie.split(";");
+          for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === name + "=") {
+              cookieValue = decodeURIComponent(
+                cookie.substring(name.length + 1)
+              );
+              break;
+            }
+          }
+        }
+        return cookieValue;
+      }
+      const csrftoken = getCookie("csrftoken");
+
+      function loadPersons() {
+        fetch("/query-tables/?table=person")
+          .then((response) => response.json())
+          .then((data) => {
+            const tbody = document.getElementById("personsTableBody");
+            if (data.data.length === 0) {
+              tbody.innerHTML =
+                '<tr><td colspan="6" class="text-center py-4">No persons found</td></tr>';
+              return;
+            }
+
+            tbody.innerHTML = data.data
+              .map(
+                (person) => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2 border-b">${person.person_id}</td>
+                    <td class="px-4 py-2 border-b">${person.first_name}</td>
+                    <td class="px-4 py-2 border-b">${person.last_name}</td>
+                    <td class="px-4 py-2 border-b">${person.email || ""}</td>
+                    <td class="px-4 py-2 border-b">${
+                      person.phone_number || ""
+                    }</td>
+                    <td class="px-4 py-2 border-b">
+                        <button onclick="deletePerson(${
+                          person.person_id
+                        })" class="text-red-600 hover:text-red-800">Delete</button>
+                    </td>
+                </tr>
+            `
+              )
+              .join("");
+          });
+      }
+
+      function addPerson() {
+        const firstName = document.getElementById("firstName").value;
+        const lastName = document.getElementById("lastName").value;
+        const email = document.getElementById("email").value;
+        const phone = document.getElementById("phone").value;
+
+        if (!firstName || !lastName) {
+          alert("First name and last name are required!");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("first_name", firstName);
+        formData.append("last_name", lastName);
+        formData.append("email", email);
+        formData.append("phone_number", phone);
+
+        fetch("/add-person/", {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrftoken,
+          },
+          body: formData,
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            alert(data.message);
+            document.getElementById("firstName").value = "";
+            document.getElementById("lastName").value = "";
+            document.getElementById("email").value = "";
+            document.getElementById("phone").value = "";
+            loadPersons();
+          });
+      }
+
+      function deletePerson(personId) {
+        if (confirm("Are you sure you want to delete this person?")) {
+          fetch(`/delete-person/${personId}/`, {
+            method: "POST",
+            headers: {
+              "X-CSRFToken": csrftoken,
+            },
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              alert(data.message);
+              loadPersons();
+            });
+        }
+      }
+
+      window.onload = loadPersons;
+    </script>
+  </body>
+</html>
